@@ -5,7 +5,7 @@ on: [push]
 jobs:
   job1:
     runs-on: ubuntu-latest
-    name: Build Node.js Docker Image and Deploy to Minikube
+    name: Build and Deploy Node.js App to Minikube
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v2
@@ -16,16 +16,30 @@ jobs:
     - name: Verify Minikube Cluster
       run: kubectl get pods -A
 
-    - name: Build Docker Image
+    - name: Build Docker Image Inside Minikube
       run: |
-        export SHELL=/bin/bash
         eval $(minikube -p minikube docker-env)
         docker build -f ./Dockerfile -t devopshint/node-app:latest .
-        echo "Verifying images:"
-        docker images         
+
+    - name: Check Available Docker Images
+      run: docker images
 
     - name: Deploy to Minikube
       run: kubectl apply -f k8s-node-app.yaml
+
+    - name: Debugging - Check Kubernetes Resources
+      run: |
+        kubectl get pods -A
+        kubectl get svc -A
+        kubectl get deployments -A
+
+    - name: Wait Until Pod is Running
+      run: |
+        echo "Waiting for pod to be in Running state..."
+        while [[ $(kubectl get pods -l app=nodejs-app -o jsonpath="{.items[0].status.phase}") != "Running" ]]; do
+          echo "Pod is not ready yet..."
+          sleep 5
+        done
 
     - name: Test Service URLs
       run: |
